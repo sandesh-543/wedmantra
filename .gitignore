@@ -1,0 +1,24 @@
+# Node dependencies
+node_modules/
+admin-panel/node_modules/
+backend/node_modules/
+
+# Environment files
+.env
+admin-panel/.env
+backend/.env
+
+# Logs
+*.log
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE/editor configs
+.idea/
+.vscode/
+
+# Build artifacts
+dist/
+build/

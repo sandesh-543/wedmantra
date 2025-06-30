@@ -1,0 +1,18 @@
+{
+  "name": "Wedmantra",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "node node_modules/react-native/local-cli/cli.js start"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/native": "^7.1.11",
+    "@react-navigation/stack": "^7.3.4",
+    "react-native": "0.80.0",
+    "react-native-image-picker": "^8.2.1",
+    "react-native-safe-area-context": "^5.4.1",
+    "react-native-screens": "^4.11.1",
+    "react-native-vector-icons": "^10.2.0"
+  }
+}
