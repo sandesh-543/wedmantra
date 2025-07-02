@@ -22,3 +22,6 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# Database
+saree-db-schema(1).sql
