@@ -40,6 +40,56 @@ const BannerModel = {
     await CacheService.del('banners:active');
     return { message: 'Banner deleted' };
   },
+  async createBanner({ title, image_url, banner_type, link_url, is_active, start_date, end_date }) {
+    const result = await db.query(
+      `INSERT INTO banners (title, image_url, banner_type, link_url, is_active, start_date, end_date, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING *`,
+      [title, image_url, banner_type, link_url, is_active, start_date, end_date]
+    );
+    return result.rows[0];
+  },
+  async updateBanner(id, updates) {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    for (const key in updates) {
+      fields.push(`${key} = $${idx}`);
+      values.push(updates[key]);
+      idx++;
+    }
+    values.push(id);
+    const result = await db.query(
+      `UPDATE banners SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    return result.rows[0];
+  },
+  async deleteBanner(id) {
+    await db.query('DELETE FROM banners WHERE id = $1', [id]);
+    return true;
+  },
+  async getBannerById(id) {
+    const result = await db.query('SELECT * FROM banners WHERE id = $1', [id]);
+    return result.rows[0];
+  },
+  async getAllBanners({ activeOnly = false, type, now = new Date() } = {}) {
+    let query = 'SELECT * FROM banners WHERE 1=1';
+    const params = [];
+    let idx = 1;
+    if (activeOnly) {
+      query += ` AND is_active = true AND (start_date IS NULL OR start_date <= $${idx}) AND (end_date IS NULL OR end_date >= $${idx})`;
+      params.push(now);
+      idx++;
+    }
+    if (type) {
+      query += ` AND banner_type = $${idx}`;
+      params.push(type);
+      idx++;
+    }
+    query += ' ORDER BY start_date DESC NULLS LAST, created_at DESC';
+    const result = await db.query(query, params);
+    return result.rows;
+  },
 };
 
 module.exports = BannerModel; 

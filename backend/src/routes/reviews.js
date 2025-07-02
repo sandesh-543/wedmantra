@@ -1,32 +1,23 @@
 const express = require('express');
 const router = express.Router();
-// const ReviewController = require('../controllers/reviewController');
-// const authMiddleware = require('../middlewares/authMiddleware');
+const ReviewController = require('../controllers/reviewController');
+const authMiddleware = require('../middlewares/authMiddleware');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
-// router.use(authMiddleware); // Uncomment when auth is ready
+// Public: Get reviews for a product
+router.get('/product/:productId', ReviewController.getReviewsByProduct);
+// Public: Get reviews by user
+router.get('/user/:userId', ReviewController.getReviewsByUser);
 
-// Get product reviews
-router.get('/product/:productId', (req, res) => {
-  // TODO: Implement get product reviews
-  res.json({ message: 'Get product reviews endpoint' });
-});
+// Admin: Get all reviews, approve, reject
+router.get('/', authMiddleware, ReviewController.getAllReviews);
+router.post('/:id/approve', authMiddleware, ReviewController.approveReview);
+router.post('/:id/reject', authMiddleware, ReviewController.rejectReview);
 
-// Add review
-router.post('/', (req, res) => {
-  // TODO: Implement add review
-  res.json({ message: 'Add review endpoint' });
-});
-
-// Update review
-router.put('/:id', (req, res) => {
-  // TODO: Implement update review
-  res.json({ message: 'Update review endpoint' });
-});
-
-// Delete review
-router.delete('/:id', (req, res) => {
-  // TODO: Implement delete review
-  res.json({ message: 'Delete review endpoint' });
-});
+// Protected: Create, update, delete review (user must be logged in)
+router.post('/', authMiddleware, upload.none(), ReviewController.createReview);
+router.put('/:id', authMiddleware, upload.none(), ReviewController.updateReview);
+router.delete('/:id', authMiddleware, ReviewController.deleteReview);
 
 module.exports = router; 

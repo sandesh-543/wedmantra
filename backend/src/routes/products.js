@@ -7,6 +7,9 @@ const ProductController = require('../controllers/productController');
 router.get('/', ProductController.getAllProducts); // List products (with filters)
 router.get('/:id', ProductController.getProductById); // Get product by ID
 
+// Product search and filtering
+router.get('/search', ProductController.searchProducts);
+
 // Product CRUD (admin only, add authMiddleware as needed)
 router.post('/', /*authMiddleware,*/ ProductController.createProduct); // Create product
 router.put('/:id', /*authMiddleware,*/ ProductController.updateProduct); // Update product

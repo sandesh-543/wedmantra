@@ -28,7 +28,8 @@ const ProductController = {
   // Create a new product
   async createProduct(req, res, next) {
     try {
-      const product = await ProductService.createProduct(req.body);
+      const productData = { ...req.body, created_by: req.user.id };
+      const product = await ProductService.createProduct(productData);
       res.status(201).json(product);
     } catch (err) {
       res.status(400).json({ message: err.message });
@@ -104,6 +105,19 @@ const ProductController = {
       res.json(result);
     } catch (err) {
       res.status(400).json({ message: err.message });
+    }
+  },
+
+  // Search and filter products
+  async searchProducts(req, res, next) {
+    try {
+      const filters = req.query;
+      const { total, products } = await ProductService.searchProducts(filters);
+      const page = filters.page ? parseInt(filters.page, 10) : 1;
+      const limit = filters.limit ? parseInt(filters.limit, 10) : 20;
+      res.json({ success: true, page, limit, total, products });
+    } catch (err) {
+      next(err);
     }
   },
 };

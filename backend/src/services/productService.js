@@ -74,6 +74,19 @@ const ProductService = {
     if (!attributeId) throw new Error('Attribute ID is required');
     return await ProductModel.deleteAttribute(attributeId);
   },
+
+  // Search and filter products
+  async searchProducts(filters) {
+    // Parse and validate filters
+    const page = filters.page ? parseInt(filters.page, 10) : 1;
+    const limit = filters.limit ? parseInt(filters.limit, 10) : 20;
+    // Pass all filters to model
+    return await ProductModel.search({
+      ...filters,
+      page,
+      limit,
+    });
+  },
 };
 
 module.exports = ProductService; 

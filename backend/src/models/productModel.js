@@ -52,9 +52,20 @@ const ProductModel = {
       throw new Error('Missing required product fields');
     }
     const result = await db.query(
-      `INSERT INTO products (name, slug, description, short_description, category_id, subcategory_id, brand_id, sku, price, sale_price, cost_price, fabric, work_type, occasion, region, length, blouse_piece, wash_care, stock_quantity, manage_stock, stock_status, meta_title, meta_description, status, featured, target_regions, festive_collection)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING *`,
-      [product.name, product.slug, product.description, product.short_description, product.category_id, product.subcategory_id, product.brand_id, product.sku, product.price, product.sale_price, product.cost_price, product.fabric, product.work_type, product.occasion, product.region, product.length, product.blouse_piece, product.wash_care, product.stock_quantity, product.manage_stock, product.stock_status, product.meta_title, product.meta_description, product.status, product.featured, product.target_regions, product.festive_collection]
+      `INSERT INTO products (
+        name, slug, description, short_description, category_id, subcategory_id, brand_id, sku, price, sale_price, cost_price,
+        fabric, work_type, occasion, region, length, blouse_piece, wash_care, stock_quantity, manage_stock, stock_status,
+        meta_title, meta_description, status, featured, target_regions, festive_collection, created_by
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+        $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
+        $22, $23, $24, $25, $26, $27, $28
+      ) RETURNING *`,
+      [
+        product.name, product.slug, product.description, product.short_description, product.category_id, product.subcategory_id, product.brand_id, product.sku, product.price, product.sale_price, product.cost_price,
+        product.fabric, product.work_type, product.occasion, product.region, product.length, product.blouse_piece, product.wash_care, product.stock_quantity, product.manage_stock, product.stock_status,
+        product.meta_title, product.meta_description, product.status, product.featured, product.target_regions, product.festive_collection, product.created_by
+      ]
     );
     // Invalidate cache
     await CacheService.invalidateCache('products:*');
@@ -137,6 +148,81 @@ const ProductModel = {
       await CacheService.del(CacheService.generateKey.product(result.rows[0].product_id));
     }
     return { message: 'Attribute deleted' };
+  },
+
+  // Search and filter products
+  async search({
+    q, category_id, subcategory_id, brand_id, min_price, max_price, fabric, occasion, region, sort, page = 1, limit = 20
+  }) {
+    let where = [];
+    let params = [];
+    let idx = 1;
+    if (q) {
+      where.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`);
+      params.push(`%${q}%`);
+      idx++;
+    }
+    if (category_id) {
+      where.push(`category_id = $${idx}`);
+      params.push(category_id);
+      idx++;
+    }
+    if (subcategory_id) {
+      where.push(`subcategory_id = $${idx}`);
+      params.push(subcategory_id);
+      idx++;
+    }
+    if (brand_id) {
+      where.push(`brand_id = $${idx}`);
+      params.push(brand_id);
+      idx++;
+    }
+    if (min_price) {
+      where.push(`price >= $${idx}`);
+      params.push(min_price);
+      idx++;
+    }
+    if (max_price) {
+      where.push(`price <= $${idx}`);
+      params.push(max_price);
+      idx++;
+    }
+    if (fabric) {
+      where.push(`fabric ILIKE $${idx}`);
+      params.push(fabric);
+      idx++;
+    }
+    if (occasion) {
+      where.push(`occasion ILIKE $${idx}`);
+      params.push(occasion);
+      idx++;
+    }
+    if (region) {
+      where.push(`region ILIKE $${idx}`);
+      params.push(region);
+      idx++;
+    }
+    let whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    // Sorting
+    let orderBy = 'ORDER BY created_at DESC';
+    if (sort === 'price_asc') orderBy = 'ORDER BY price ASC';
+    else if (sort === 'price_desc') orderBy = 'ORDER BY price DESC';
+    else if (sort === 'newest') orderBy = 'ORDER BY created_at DESC';
+    // else default (relevance) is created_at DESC for MVP
+    // Pagination
+    const offset = (page - 1) * limit;
+    // Total count
+    const countResult = await db.query(`SELECT COUNT(*) FROM products ${whereClause}`, params);
+    const total = parseInt(countResult.rows[0].count, 10);
+    // Results
+    const result = await db.query(
+      `SELECT * FROM products ${whereClause} ${orderBy} OFFSET $${idx} LIMIT $${idx + 1}`,
+      [...params, offset, limit]
+    );
+    return {
+      total,
+      products: result.rows
+    };
   },
 };
 

@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const UserModel = require('../models/userModel');
 
-const authMiddleware = async (req, res, next) => {
+const authenticate = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
@@ -29,4 +29,13 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = authMiddleware; 
+const authorize = (roles = []) => {
+  return (req, res, next) => {
+    if (!req.user || (roles.length && !roles.includes(req.user.role))) {
+      return res.status(403).json({ message: 'Forbidden: insufficient permissions' });
+    }
+    next();
+  };
+};
+
+module.exports = { authenticate, authorize }; 

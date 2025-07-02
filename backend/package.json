@@ -23,7 +23,8 @@
     "redis": "^4.6.10",
     "razorpay": "^2.8.6",
     "twilio": "^4.19.0",
-    "crypto": "^1.0.1"
+    "crypto": "^1.0.1",
+    "bad-words": "^3.0.4"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

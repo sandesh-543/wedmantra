@@ -1,33 +1,16 @@
 const express = require('express');
 const router = express.Router();
-// const BannerController = require('../controllers/bannerController');
+const BannerController = require('../controllers/bannerController');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
-// Get active banners
-router.get('/', (req, res) => {
-  // TODO: Implement get active banners
-  res.json({ message: 'Get banners endpoint' });
-});
+// Public: Get all active banners (with optional type)
+router.get('/', BannerController.getAllBanners);
+router.get('/:id', BannerController.getBannerById);
 
-// Get banner by type
-router.get('/type/:type', (req, res) => {
-  // TODO: Implement get banners by type
-  res.json({ message: 'Get banners by type endpoint' });
-});
-
-// Admin routes (protected)
-// router.post('/', authMiddleware, (req, res) => {
-//   // TODO: Implement create banner
-//   res.json({ message: 'Create banner endpoint' });
-// });
-
-// router.put('/:id', authMiddleware, (req, res) => {
-//   // TODO: Implement update banner
-//   res.json({ message: 'Update banner endpoint' });
-// });
-
-// router.delete('/:id', authMiddleware, (req, res) => {
-//   // TODO: Implement delete banner
-//   res.json({ message: 'Delete banner endpoint' });
-// });
+// Admin: Create, update, delete banners (no role check for now)
+router.post('/', upload.single('image'), BannerController.createBanner);
+router.put('/:id', upload.single('image'), BannerController.updateBanner);
+router.delete('/:id', BannerController.deleteBanner);
 
 module.exports = router; 

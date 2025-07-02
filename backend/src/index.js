@@ -24,6 +24,9 @@ const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
 const couponRoutes = require('./routes/coupons');
 const bannerRoutes = require('./routes/banners');
+const notificationRoutes = require('./routes/notifications');
+const analyticsRoutes = require('./routes/analytics');
+const fcmRoutes = require('./routes/fcm');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -37,6 +40,9 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/banners', bannerRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/fcm', fcmRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
