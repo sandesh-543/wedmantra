@@ -1,22 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const ProductController = require('../controllers/productController');
+// const authMiddleware = require('../middlewares/authMiddleware');
 
-// Get all products
-router.get('/', ProductController.getAllProducts);
+// Public product endpoints
+router.get('/', ProductController.getAllProducts); // List products (with filters)
+router.get('/:id', ProductController.getProductById); // Get product by ID
 
-// Get product by ID
-router.get('/:id', ProductController.getProductById);
+// Product CRUD (admin only, add authMiddleware as needed)
+router.post('/', /*authMiddleware,*/ ProductController.createProduct); // Create product
+router.put('/:id', /*authMiddleware,*/ ProductController.updateProduct); // Update product
+router.delete('/:id', /*authMiddleware,*/ ProductController.deleteProduct); // Delete product
 
-// Create product
-router.post('/', ProductController.createProduct);
+// Product media endpoints
+router.get('/:id/media', ProductController.getProductMedia); // Get product media
+router.post('/:id/media', /*authMiddleware,*/ ProductController.addProductMedia); // Add product media
+router.delete('/media/:mediaId', /*authMiddleware,*/ ProductController.deleteProductMedia); // Delete product media
 
-// Update product
-router.put('/:id', ProductController.updateProduct);
-
-// Delete product
-router.delete('/:id', ProductController.deleteProduct);
-
-// Add more routes as needed (media, attributes)
+// Product attributes endpoints
+router.get('/:id/attributes', ProductController.getProductAttributes); // Get product attributes
+router.post('/:id/attributes', /*authMiddleware,*/ ProductController.addProductAttribute); // Add product attribute
+router.delete('/attributes/:attributeId', /*authMiddleware,*/ ProductController.deleteProductAttribute); // Delete product attribute
 
 module.exports = router;

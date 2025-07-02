@@ -24,7 +24,7 @@ const UserModel = {
     return result.rows[0];
   },
   
-  async findById(id) {
+  async findById(id) { // why this is not using cache
     const cacheKey = CacheService.generateKey.user(id);
     return await CacheService.cacheWrapper(cacheKey, async () => {
       const result = await db.query('SELECT * FROM users WHERE id = $1', [id]);
@@ -44,7 +44,7 @@ const UserModel = {
     return result.rows[0];
   },
   
-  async updatePassword(id, newPassword) {
+  async changePasswordAuthenticated(id, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const result = await db.query(
       `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
@@ -82,7 +82,7 @@ const UserModel = {
     return result.rows[0];
   },
   
-  async changePassword(id, newPassword) {
+  async changePasswordWithResetToken(id, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const result = await db.query(
       `UPDATE users SET password_hash = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2 RETURNING *`,

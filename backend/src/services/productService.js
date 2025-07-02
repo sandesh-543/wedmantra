@@ -1,22 +1,79 @@
 const ProductModel = require('../models/productModel');
 
 const ProductService = {
-  async getAllProducts() {
-    return await ProductModel.getAll();
+  // Get all products with optional filters
+  async getAllProducts(filters = {}) {
+    // Validate filters if needed
+    return await ProductModel.getAll(filters);
   },
+
+  // Get a single product by ID (with media and attributes)
   async getProductById(id) {
-    return await ProductModel.getById(id);
+    if (!id) throw new Error('Product ID is required');
+    const product = await ProductModel.getById(id);
+    if (!product) throw new Error('Product not found');
+    // Attach media and attributes
+    product.media = await ProductModel.getMedia(id);
+    product.attributes = await ProductModel.getAttributes(id);
+    return product;
   },
-  async createProduct(product) {
-    return await ProductModel.create(product);
+
+  // Create a new product
+  async createProduct(productData) {
+    // Validate required fields
+    if (!productData.name || !productData.slug || !productData.sku || !productData.price) {
+      throw new Error('Missing required product fields');
+    }
+    // TODO: Add more validation (e.g., unique slug, sku)
+    const product = await ProductModel.create(productData);
+    return product;
   },
-  async updateProduct(id, product) {
-    return await ProductModel.update(id, product);
+
+  // Update an existing product
+  async updateProduct(id, productData) {
+    if (!id) throw new Error('Product ID is required');
+    // Validate required fields
+    if (!productData.name || !productData.slug || !productData.sku || !productData.price) {
+      throw new Error('Missing required product fields');
+    }
+    // TODO: Add more validation (e.g., unique slug, sku)
+    const product = await ProductModel.update(id, productData);
+    return product;
   },
+
+  // Delete a product
   async deleteProduct(id) {
+    if (!id) throw new Error('Product ID is required');
     return await ProductModel.delete(id);
   },
-  // Media and attributes methods would be added here
+
+  // Product media
+  async getProductMedia(productId) {
+    if (!productId) throw new Error('Product ID is required');
+    return await ProductModel.getMedia(productId);
+  },
+  async addProductMedia(productId, media) {
+    if (!productId) throw new Error('Product ID is required');
+    return await ProductModel.addMedia(productId, media);
+  },
+  async deleteProductMedia(mediaId) {
+    if (!mediaId) throw new Error('Media ID is required');
+    return await ProductModel.deleteMedia(mediaId);
+  },
+
+  // Product attributes
+  async getProductAttributes(productId) {
+    if (!productId) throw new Error('Product ID is required');
+    return await ProductModel.getAttributes(productId);
+  },
+  async addProductAttribute(productId, attribute) {
+    if (!productId) throw new Error('Product ID is required');
+    return await ProductModel.addAttribute(productId, attribute);
+  },
+  async deleteProductAttribute(attributeId) {
+    if (!attributeId) throw new Error('Attribute ID is required');
+    return await ProductModel.deleteAttribute(attributeId);
+  },
 };
 
 module.exports = ProductService; 

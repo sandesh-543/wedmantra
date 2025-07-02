@@ -1,26 +1,18 @@
 const express = require('express');
 const router = express.Router();
-// const PaymentController = require('../controllers/paymentController');
-// const authMiddleware = require('../middlewares/authMiddleware');
+const PaymentController = require('../controllers/paymentController');
+const authMiddleware = require('../middlewares/authMiddleware');
 
-// router.use(authMiddleware); // Uncomment when auth is ready
+// Public routes
+router.post('/razorpay/create-order', PaymentController.createRazorpayOrder);
+router.post('/razorpay/verify', PaymentController.verifyRazorpayPayment);
+router.post('/razorpay/webhook', PaymentController.razorpayWebhook);
+router.post('/cod/initiate', PaymentController.initiateCOD);
+router.post('/cod/verify-otp', PaymentController.verifyCODOtp);
+router.post('/upi/initiate', PaymentController.initiateUPIIntent);
 
-// Create payment order (Razorpay)
-router.post('/create-order', (req, res) => {
-  // TODO: Implement Razorpay order creation
-  res.json({ message: 'Create payment order endpoint' });
-});
-
-// Verify payment
-router.post('/verify', (req, res) => {
-  // TODO: Implement payment verification
-  res.json({ message: 'Verify payment endpoint' });
-});
-
-// Get payment status
-router.get('/:paymentId', (req, res) => {
-  // TODO: Implement get payment status
-  res.json({ message: 'Get payment status endpoint' });
-});
+// Protected routes
+router.get('/status/:paymentId', authMiddleware, PaymentController.getPaymentStatus);
+router.get('/order/:orderId', authMiddleware, PaymentController.getPaymentsByOrder);
 
 module.exports = router; 

@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+const dotenv = require('dotenv');
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 
@@ -9,20 +12,35 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/products', require('./routes/products'));
-app.use('/api/cart', require('./routes/cart'));
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/wishlist', require('./routes/wishlist'));
-app.use('/api/reviews', require('./routes/reviews'));
-app.use('/api/payments', require('./routes/payments'));
-app.use('/api/banners', require('./routes/banners'));
-app.use('/api/coupons', require('./routes/coupons'));
-app.use('/api/cache', require('./routes/cache'));
+// Import routes
+const authRoutes = require('./routes/auth');
+const productRoutes = require('./routes/products');
+const categoryRoutes = require('./routes/categories');
+const brandRoutes = require('./routes/brands');
+const subcategoryRoutes = require('./routes/subcategories');
+const cartRoutes = require('./routes/cart');
+const wishlistRoutes = require('./routes/wishlist');
+const orderRoutes = require('./routes/orders');
+const paymentRoutes = require('./routes/payments');
+const couponRoutes = require('./routes/coupons');
+const bannerRoutes = require('./routes/banners');
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to Wedmantra API' });
+// Use routes
+app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/subcategories', subcategoryRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/banners', bannerRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Wedmantra Backend is running' });
 });
 
 // Error handling middleware
@@ -31,7 +49,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
 const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+module.exports = app;
