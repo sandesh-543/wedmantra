@@ -5,9 +5,9 @@ const { CacheService, CACHE_TTL } = require('../services/cacheService');
 const UserModel = {
   async create(user) {
     const result = await db.query(
-      `INSERT INTO users (email, phone, password_hash, full_name, role, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *`,
-      [user.email, user.phone, user.password_hash, user.full_name, user.role || 'customer']
+      `INSERT INTO users (email, phone, password_hash, first_name, last_name, role, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING *`,
+      [user.email, user.phone, user.password_hash, user.first_name, user.last_name, user.role || 'customer']
     );
     
     // Cache the new user
@@ -33,8 +33,8 @@ const UserModel = {
   
   async update(id, updates) {
     const result = await db.query(
-      `UPDATE users SET full_name = $1, phone = $2, phone_verified = $3, updated_at = NOW() WHERE id = $4 RETURNING *`,
-      [updates.full_name, updates.phone, updates.phone_verified, id]
+      `UPDATE users SET first_name = $1, last_name = $2, phone = $3, phone_verified = $4, updated_at = NOW() WHERE id = $5 RETURNING *`,
+      [updates.first_name, updates.last_name, updates.phone, updates.phone_verified, id]
     );
     
     // Invalidate user cache after update

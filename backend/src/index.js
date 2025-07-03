@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJSDoc = require('swagger-jsdoc');
+const morgan = require('morgan');
 
 // Load environment variables
 dotenv.config();
@@ -17,10 +20,65 @@ const publicLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 
+// Swagger setup
+const swaggerDefinition = {
+  openapi: '3.0.0',
+  info: {
+    title: 'Wedmantra E-commerce API',
+    version: '1.0.0',
+    description: 'API documentation for Wedmantra backend',
+  },
+  servers: [
+    {
+      url: 'http://localhost:5000',
+      description: 'Development server',
+    },
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
+  },
+  security: [{ bearerAuth: [] }],
+};
+
+const swaggerOptions = {
+  swaggerDefinition,
+  apis: ['./src/routes/*.js', './src/controllers/*.js'], // You can add more paths if needed
+};
+
+const swaggerSpec = swaggerJSDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Middleware
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5001',
+  'https://admin.wedmantra.com'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Morgan request logging (dev only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+}
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -75,8 +133,10 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Remove app.listen from here for testability
+// app.listen(PORT, () => {
+//   console.log(`Server is running on port ${PORT}`);
+//   console.log(`API docs available at http://localhost:${PORT}/api-docs`);
+// });
 
 module.exports = app;

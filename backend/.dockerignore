@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+tests
+uploads
+.env
+*.md
+*.pdf
+*.sql
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.DS_Store 

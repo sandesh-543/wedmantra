@@ -8,8 +8,8 @@ const nodemailer = require('nodemailer');
 const UserService = {
   async register(userData) {
     // Validation
-    if (!userData.email || !userData.password || !userData.full_name) {
-      throw new Error('Email, password, and full name are required');
+    if (!userData.email || !userData.password || !userData.first_name) {
+      throw new Error('Email, password, and first name are required');
     }
     
     // Check if user already exists

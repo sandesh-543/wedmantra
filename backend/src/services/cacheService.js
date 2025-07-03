@@ -26,7 +26,7 @@ const CacheService = {
   // Set data in cache with TTL
   async set(key, data, ttl = 3600) {
     try {
-      await redis.setex(key, ttl, JSON.stringify(data));
+      await redis.set(key, JSON.stringify(data), { EX: ttl });
       return true;
     } catch (error) {
       console.error('Redis set error:', error);
