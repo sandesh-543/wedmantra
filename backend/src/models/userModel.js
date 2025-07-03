@@ -4,11 +4,10 @@ const { CacheService, CACHE_TTL } = require('../services/cacheService');
 
 const UserModel = {
   async create(user) {
-    const hashedPassword = await bcrypt.hash(user.password, 10);
     const result = await db.query(
-      `INSERT INTO users (email, phone, password_hash, first_name, last_name, role)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [user.email, user.phone, hashedPassword, user.first_name, user.last_name, user.role || 'customer']
+      `INSERT INTO users (email, phone, password_hash, full_name, role, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *`,
+      [user.email, user.phone, user.password_hash, user.full_name, user.role || 'customer']
     );
     
     // Cache the new user
@@ -24,7 +23,7 @@ const UserModel = {
     return result.rows[0];
   },
   
-  async findById(id) { // why this is not using cache
+  async findById(id) {
     const cacheKey = CacheService.generateKey.user(id);
     return await CacheService.cacheWrapper(cacheKey, async () => {
       const result = await db.query('SELECT * FROM users WHERE id = $1', [id]);
@@ -34,8 +33,8 @@ const UserModel = {
   
   async update(id, updates) {
     const result = await db.query(
-      `UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW() WHERE id = $4 RETURNING *`,
-      [updates.first_name, updates.last_name, updates.phone, id]
+      `UPDATE users SET full_name = $1, phone = $2, phone_verified = $3, updated_at = NOW() WHERE id = $4 RETURNING *`,
+      [updates.full_name, updates.phone, updates.phone_verified, id]
     );
     
     // Invalidate user cache after update
@@ -43,56 +42,36 @@ const UserModel = {
     
     return result.rows[0];
   },
-  
-  async changePasswordAuthenticated(id, newPassword) {
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  async updatePassword(userId, hashedPassword) {
     const result = await db.query(
       `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-      [hashedPassword, id]
+      [hashedPassword, userId]
     );
     
     // Invalidate user cache after password update
-    await CacheService.del(CacheService.generateKey.user(id));
+    await CacheService.del(CacheService.generateKey.user(userId));
     
     return result.rows[0];
   },
-  
-  async resetPassword(id, newPassword) {
-    // Send password reset email
-    // Generate a unique token
-    // Store the token in the database
-    // Return the token
-    const token = crypto.randomBytes(32).toString('hex');
+
+  async updatePasswordByEmail(email, hashedPassword) {
     const result = await db.query(
-      `UPDATE users SET password_reset_token = $1, password_reset_expires = NOW() + INTERVAL '1 hour' WHERE id = $2 RETURNING *`,
-      [token, id]
+      `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE email = $2 RETURNING *`,
+      [hashedPassword, email]
     );
     
-    // Invalidate user cache after password reset
-    await CacheService.del(CacheService.generateKey.user(id));
+    if (result.rows[0]) {
+      // Invalidate user cache after password update
+      await CacheService.del(CacheService.generateKey.user(result.rows[0].id));
+    }
     
     return result.rows[0];
   },
   
-  async verifyPasswordResetToken(id, token) {
-    const result = await db.query(
-      `SELECT * FROM users WHERE id = $1 AND password_reset_token = $2 AND password_reset_expires > NOW()`,
-      [id, token]
-    );
-    return result.rows[0];
-  },
-  
-  async changePasswordWithResetToken(id, newPassword) {
+  async changePasswordAuthenticated(id, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    const result = await db.query(
-      `UPDATE users SET password_hash = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2 RETURNING *`,
-      [hashedPassword, id]
-    );
-    
-    // Invalidate user cache after password change
-    await CacheService.del(CacheService.generateKey.user(id));
-    
-    return result.rows[0];
+    return await this.updatePassword(id, hashedPassword);
   },
   
   async delete(id) {

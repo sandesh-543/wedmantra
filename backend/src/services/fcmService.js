@@ -1,12 +1,14 @@
 const admin = require('firebase-admin');
 const fcmModel = require('../models/fcmModel');
-const path = require('path');
 
-// Initialize Firebase Admin SDK (service account key path from env or default location)
+// Initialize Firebase Admin SDK using .env variables
 if (!admin.apps.length) {
-  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || path.join(__dirname, '../../firebase-service-account.json');
   admin.initializeApp({
-    credential: admin.credential.cert(require(serviceAccountPath)),
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
   });
 }
 

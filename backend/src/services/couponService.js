@@ -64,17 +64,98 @@ const CouponService = {
   },
 
   // Admin CRUD
-  async createCoupon(data) {
-    // TODO: Add admin validation if needed
+  async createCoupon(data, adminId) {
+    // Admin validation
+    if (!adminId) throw new Error('Admin ID is required');
+    
+    // Validate required fields
+    if (!data.code || !data.type || !data.value || !data.valid_from || !data.valid_until) {
+      throw new Error('Code, type, value, valid_from, and valid_until are required');
+    }
+
+    // Validate coupon type
+    if (!['percentage', 'fixed_amount'].includes(data.type)) {
+      throw new Error('Invalid coupon type');
+    }
+
+    // Validate value
+    if (data.value <= 0) {
+      throw new Error('Coupon value must be greater than 0');
+    }
+
+    // Validate dates
+    if (new Date(data.valid_from) >= new Date(data.valid_until)) {
+      throw new Error('Valid until date must be after valid from date');
+    }
+
+    // Check if code already exists
+    const existingCoupon = await CouponModel.getByCode(data.code);
+    if (existingCoupon) {
+      throw new Error('Coupon code already exists');
+    }
+
     return await CouponModel.create(data);
   },
-  async updateCoupon(id, data) {
-    // TODO: Add admin validation if needed
+
+  async updateCoupon(id, data, adminId) {
+    // Admin validation
+    if (!adminId) throw new Error('Admin ID is required');
+    
+    // Validate coupon type if being updated
+    if (data.type && !['percentage', 'fixed_amount'].includes(data.type)) {
+      throw new Error('Invalid coupon type');
+    }
+
+    // Validate value if being updated
+    if (data.value && data.value <= 0) {
+      throw new Error('Coupon value must be greater than 0');
+    }
+
+    // Validate dates if being updated
+    if (data.valid_from && data.valid_until) {
+      if (new Date(data.valid_from) >= new Date(data.valid_until)) {
+        throw new Error('Valid until date must be after valid from date');
+      }
+    }
+
+    // Check if code already exists (if being updated)
+    if (data.code) {
+      const existingCoupon = await CouponModel.getByCode(data.code);
+      if (existingCoupon && existingCoupon.id !== parseInt(id)) {
+        throw new Error('Coupon code already exists');
+      }
+    }
+
     return await CouponModel.update(id, data);
   },
-  async deleteCoupon(id, code) {
-    return await CouponModel.delete(id, code);
+
+  async deleteCoupon(id, adminId) {
+    // Admin validation
+    if (!adminId) throw new Error('Admin ID is required');
+    
+    return await CouponModel.delete(id);
   },
+
+  async getAllCoupons(adminId) {
+    // Admin validation
+    if (!adminId) throw new Error('Admin ID is required');
+    
+    return await CouponModel.getAll();
+  },
+
+  async getCouponById(id, adminId) {
+    // Admin validation
+    if (!adminId) throw new Error('Admin ID is required');
+    
+    return await CouponModel.getById(id);
+  },
+
+  async getCouponUsage(id, adminId) {
+    // Admin validation
+    if (!adminId) throw new Error('Admin ID is required');
+    
+    return await CouponModel.getUsage(id);
+  }
 };
 
 module.exports = CouponService; 

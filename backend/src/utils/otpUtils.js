@@ -11,6 +11,21 @@ const OTPUtils = {
     return Math.floor(100000 + Math.random() * 900000).toString();
   },
 
+  // Send SMS via Twilio
+  async sendSMS(phoneNumber, message) {
+    try {
+      await client.messages.create({
+        body: message,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phoneNumber
+      });
+      return { success: true, message: 'SMS sent successfully' };
+    } catch (error) {
+      console.error('SMS sending failed:', error);
+      throw new Error('Failed to send SMS');
+    }
+  },
+
   // Send OTP via SMS using Twilio
   async sendOtpToPhone(phoneNumber, orderId) {
     const otp = this.generateOTP();
@@ -25,11 +40,7 @@ const OTPUtils = {
 
     // Send SMS via Twilio
     const message = `Your OTP for COD order #${orderId} is ${otp}. Valid for ${OTP_EXPIRY_MINUTES} minutes.`;
-    await client.messages.create({
-      body: message,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: phoneNumber
-    });
+    await this.sendSMS(phoneNumber, message);
 
     return { success: true, message: 'OTP sent successfully' };
   },

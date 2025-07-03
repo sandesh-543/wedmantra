@@ -1,22 +1,37 @@
 const express = require('express');
 const router = express.Router();
 const OrderController = require('../controllers/orderController');
-// const authMiddleware = require('../middlewares/authMiddleware');
+const { authenticate, authorize } = require('../middlewares/authMiddleware');
 
-// router.use(authMiddleware); // Uncomment when auth is ready
+// All routes require authentication
+router.use(authenticate);
 
 // Create order
 router.post('/', OrderController.createOrder);
 
 // Get user orders
-router.get('/', OrderController.getUserOrders);
+router.get('/my-orders', OrderController.getUserOrders);
 
-// Get order by ID
+// Get specific order
 router.get('/:id', OrderController.getOrderById);
 
-// Update order status
-router.put('/:id/status', OrderController.updateOrderStatus);
+// Update order status (admin only)
+router.patch('/:id/status', authorize(['admin', 'superadmin']), OrderController.updateOrderStatus);
 
-// TODO: Add payment routes, order tracking
+// Payment routes
+router.post('/:orderId/payment', OrderController.processPayment);
+router.post('/:orderId/verify-payment', OrderController.verifyPayment);
+
+// Order tracking
+router.patch('/:id/cancel', OrderController.cancelOrder);
+
+// Order items
+router.get('/:orderId/items', OrderController.getOrderItems);
+router.post('/:orderId/items', OrderController.addOrderItem);
+router.put('/:itemId', OrderController.updateOrderItem);
+router.delete('/:itemId', OrderController.removeOrderItem);
+
+// Admin endpoints
+router.get('/', authorize(['admin', 'superadmin']), OrderController.getAllOrders);
 
 module.exports = router; 
