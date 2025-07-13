@@ -167,7 +167,56 @@ const OrderModel = {
       [itemId]
     );
     return result.rows[0];
-  }
+  },
+
+  // Get all orders (for admin)
+async getAll() {
+    try {
+      const result = await db.query(
+        `SELECT 
+          o.*,
+          u.first_name,
+          u.last_name,
+          u.email,
+          COUNT(oi.id) as item_count
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        GROUP BY o.id, u.first_name, u.last_name, u.email
+        ORDER BY o.created_at DESC`
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error fetching all orders:', error);
+      throw error;
+    }
+},
+
+// Get orders by admin (for regular admins - their products only)
+async getByAdmin(adminId) {
+    try {
+      const result = await db.query(
+        `SELECT DISTINCT
+          o.*,
+          u.first_name,
+          u.last_name,
+          u.email,
+          COUNT(oi.id) as item_count
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE p.created_by = $1
+        GROUP BY o.id, u.first_name, u.last_name, u.email
+        ORDER BY o.created_at DESC`,
+        [adminId]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error fetching admin orders:', error);
+      throw error;
+    }
+  },
 };
 
 module.exports = OrderModel; 

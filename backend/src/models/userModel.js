@@ -79,6 +79,69 @@ const UserModel = {
     
     // Invalidate user cache after deletion
     await CacheService.del(CacheService.generateKey.user(id));
+  },
+
+  // Find user by phone
+  async findByPhone(phone) {
+    try {
+      const result = await db.query('SELECT * FROM users WHERE phone = $1', [phone]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error finding user by phone:', error);
+      throw error;
+    }
+  },
+
+  // Get all users (for admin)
+  async getAll(filters = {}) {
+    try {
+      let query = 'SELECT id, email, phone, first_name, last_name, role, is_active, email_verified, phone_verified, created_at FROM users';
+      const values = [];
+      const conditions = [];
+      let idx = 1;
+
+      if (filters.role) {
+        conditions.push(`role = $${idx++}`);
+        values.push(filters.role);
+      }
+      if (filters.is_active !== undefined) {
+        conditions.push(`is_active = $${idx++}`);
+        values.push(filters.is_active);
+      }
+
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+      }
+
+      query += ' ORDER BY created_at DESC';
+
+      if (filters.limit) {
+        query += ` LIMIT $${idx++}`;
+        values.push(filters.limit);
+      }
+
+      const result = await db.query(query, values);
+      return result.rows;
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      throw error;
+    }
+  },
+
+// Update user status
+  async updateStatus(id, isActive) {
+    try {
+      const result = await db.query(
+        'UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [isActive, id]
+      );
+      // Invalidate user cache
+      await CacheService.del(CacheService.generateKey.user(id));
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      throw error;
+    }
   }
 };
 

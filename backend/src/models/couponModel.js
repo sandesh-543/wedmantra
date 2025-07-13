@@ -64,6 +64,37 @@ const CouponModel = {
       [couponId, userId, orderId, discountAmount]
     );
   },
+  // Get all coupons (for admin)
+  async getAll() {
+    try {
+      const result = await db.query(
+        'SELECT *, (used_count::float / NULLIF(usage_limit, 0) * 100) as usage_percentage FROM coupons ORDER BY created_at DESC'
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error fetching all coupons:', error);
+      throw error;
+    }
+  },
+
+  // Get coupon usage statistics
+  async getUsageStats(couponId) {
+    try {
+      const result = await db.query(
+        `SELECT 
+          COUNT(*) as total_uses,
+          SUM(discount_amount) as total_discount,
+          COUNT(DISTINCT user_id) as unique_users
+        FROM coupon_usage 
+        WHERE coupon_id = $1`,
+        [couponId]
+      );
+      return result.rows[0];
+      } catch (error) {
+      console.error('Error fetching coupon usage stats:', error);
+      throw error;
+    }
+  },
 };
 
 module.exports = CouponModel; 

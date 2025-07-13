@@ -224,6 +224,80 @@ const ProductModel = {
       products: result.rows
     };
   },
+  async getBySKU(sku) {
+    try {
+      const result = await db.query('SELECT * FROM products WHERE sku = $1', [sku]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error fetching product by SKU:', error);
+      throw error;
+    }
+},
+
+// Get featured products
+async getFeatured(limit = 10) {
+  const cacheKey = `products:featured:${limit}`;
+  return await CacheService.cacheWrapper(cacheKey, async () => {
+    const result = await db.query(
+      'SELECT * FROM products WHERE featured = true AND status = $1 ORDER BY created_at DESC LIMIT $2',
+      ['active', limit]
+    );
+    return result.rows;
+  }, CACHE_TTL.PRODUCTS);
+},
+
+// Get products by category
+async getByCategory(categoryId, filters = {}) {
+  let query = 'SELECT * FROM products WHERE category_id = $1 AND status = $2';
+  const values = [categoryId, 'active'];
+  let idx = 3;
+
+  if (filters.min_price) {
+    query += ` AND price >= $${idx++}`;
+    values.push(filters.min_price);
+  }
+  if (filters.max_price) {
+    query += ` AND price <= $${idx++}`;
+    values.push(filters.max_price);
+  }
+  if (filters.fabric) {
+    query += ` AND fabric ILIKE $${idx++}`;
+    values.push(`%${filters.fabric}%`);
+  }
+
+  query += ' ORDER BY created_at DESC';
+  
+  if (filters.limit) {
+    query += ` LIMIT $${idx++}`;
+    values.push(filters.limit);
+  }
+
+  const result = await db.query(query, values);
+  return result.rows;
+},
+
+// Update product status
+async updateStatus(id, status) {
+  const result = await db.query(
+    'UPDATE products SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+    [status, id]
+  );
+  // Invalidate cache
+  await CacheService.del(CacheService.generateKey.product(id));
+  await CacheService.invalidateCache('products:*');
+  return result.rows[0];
+},
+
+// Update stock quantity
+async updateStock(id, quantity) {
+  const result = await db.query(
+    'UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+    [quantity, id]
+  );
+  // Invalidate cache
+  await CacheService.del(CacheService.generateKey.product(id));
+  return result.rows[0];
+},
 };
 
 module.exports = ProductModel; 
