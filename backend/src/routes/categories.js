@@ -1,15 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const CategoryController = require('../controllers/categoryController');
-// const authMiddleware = require('../middlewares/authMiddleware');
+const { authenticate, authorize } = require('../middlewares/authMiddleware');
+const { validateCategory, validateIdParam } = require('../middlewares/validation');
 
 // Public endpoints
-router.get('/', CategoryController.getAllCategories); // List categories
-router.get('/:id', CategoryController.getCategoryById); // Get category by ID
+router.get('/', CategoryController.getAllCategories);
+router.get('/:id', validateIdParam, CategoryController.getCategoryById);
 
-// Admin endpoints (add authMiddleware as needed)
-router.post('/', /*authMiddleware,*/ CategoryController.createCategory); // Create category
-router.put('/:id', /*authMiddleware,*/ CategoryController.updateCategory); // Update category
-router.delete('/:id', /*authMiddleware,*/ CategoryController.deleteCategory); // Delete category
+// Admin endpoints
+router.post('/', 
+  authenticate, 
+  authorize(['admin', 'superadmin']), 
+  validateCategory, 
+  CategoryController.createCategory
+);
 
-module.exports = router; 
+router.put('/:id', 
+  authenticate, 
+  authorize(['admin', 'superadmin']), 
+  validateIdParam, 
+  validateCategory, 
+  CategoryController.updateCategory
+);
+
+router.delete('/:id', 
+  authenticate, 
+  authorize(['admin', 'superadmin']), 
+  validateIdParam, 
+  CategoryController.deleteCategory
+);
+
+module.exports = router;

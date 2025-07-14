@@ -12,8 +12,18 @@ const CACHE_TTL = {
 };
 
 const CacheService = {
+  // Check if Redis is available
+  isRedisAvailable() {
+    return redis && redis.isReady;
+  },
+
   // Get data from cache
   async get(key) {
+    if (!this.isRedisAvailable()) {
+      console.log('Redis not available, skipping cache get');
+      return null;
+    }
+
     try {
       const data = await redis.get(key);
       return data ? JSON.parse(data) : null;
@@ -25,8 +35,13 @@ const CacheService = {
 
   // Set data in cache with TTL
   async set(key, data, ttl = 3600) {
+    if (!this.isRedisAvailable()) {
+      console.log('Redis not available, skipping cache set');
+      return false;
+    }
+
     try {
-      await redis.set(key, JSON.stringify(data), { EX: ttl });
+      await redis.setEx(key, ttl, JSON.stringify(data));
       return true;
     } catch (error) {
       console.error('Redis set error:', error);
@@ -36,6 +51,11 @@ const CacheService = {
 
   // Delete cache key
   async del(key) {
+    if (!this.isRedisAvailable()) {
+      console.log('Redis not available, skipping cache delete');
+      return false;
+    }
+
     try {
       await redis.del(key);
       return true;
@@ -47,6 +67,11 @@ const CacheService = {
 
   // Delete multiple keys with pattern
   async delPattern(pattern) {
+    if (!this.isRedisAvailable()) {
+      console.log('Redis not available, skipping pattern delete');
+      return false;
+    }
+
     try {
       const keys = await redis.keys(pattern);
       if (keys.length > 0) {
@@ -74,9 +99,11 @@ const CacheService = {
       console.log(`Cache MISS for key: ${key}`);
       data = await dbQuery();
       
-      // Store in cache
+      // Store in cache (don't await to avoid blocking)
       if (data) {
-        await this.set(key, data, ttl);
+        this.set(key, data, ttl).catch(err => 
+          console.error('Background cache set failed:', err)
+        );
       }
       
       return data;
@@ -112,4 +139,4 @@ const CacheService = {
   }
 };
 
-module.exports = { CacheService, CACHE_TTL }; 
+module.exports = { CacheService, CACHE_TTL };

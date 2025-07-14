@@ -1,15 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const BrandController = require('../controllers/brandController');
-// const authMiddleware = require('../middlewares/authMiddleware');
+const { authenticate, authorize } = require('../middlewares/authMiddleware');
+const { validateBrand, validateIdParam } = require('../middlewares/validation');
 
 // Public endpoints
-router.get('/', BrandController.getAllBrands); // List brands
-router.get('/:id', BrandController.getBrandById); // Get brand by ID
+router.get('/', BrandController.getAllBrands);
+router.get('/:id', validateIdParam, BrandController.getBrandById);
 
-// Admin endpoints (add authMiddleware as needed)
-router.post('/', /*authMiddleware,*/ BrandController.createBrand); // Create brand
-router.put('/:id', /*authMiddleware,*/ BrandController.updateBrand); // Update brand
-router.delete('/:id', /*authMiddleware,*/ BrandController.deleteBrand); // Delete brand
+// Admin endpoints
+router.post('/', 
+  authenticate, 
+  authorize(['admin', 'superadmin']), 
+  validateBrand, 
+  BrandController.createBrand
+);
 
-module.exports = router; 
+router.put('/:id', 
+  authenticate, 
+  authorize(['admin', 'superadmin']), 
+  validateIdParam, 
+  validateBrand, 
+  BrandController.updateBrand
+);
+
+router.delete('/:id', 
+  authenticate, 
+  authorize(['admin', 'superadmin']), 
+  validateIdParam, 
+  BrandController.deleteBrand
+);
+
+module.exports = router;

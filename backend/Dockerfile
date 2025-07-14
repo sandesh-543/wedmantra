@@ -17,6 +17,9 @@ ENV NODE_ENV=production
 # Expose port
 EXPOSE 5000
 
+# Install bash for wait-for-it.sh
+RUN apk add --no-cache bash
+
 # Add wait-for-it.sh
 ADD https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh /wait-for-it.sh
 RUN chmod +x /wait-for-it.sh

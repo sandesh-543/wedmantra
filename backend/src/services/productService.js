@@ -231,7 +231,23 @@ const ProductService = {
 
   async incrementViews(id) {
     return await ProductModel.incrementViews(id);
-  }
+  },
+  // Get featured products
+  async getFeaturedProducts(limit = 10) {
+    return await ProductModel.getFeatured(limit);
+  },
+
+  // Get products by category
+  async getProductsByCategory(categoryId, filters = {}) {
+    if (!categoryId) throw new Error('Category ID is required');
+    
+    // Validate category exists
+    const CategoryModel = require('../models/categoryModel');
+    const category = await CategoryModel.getById(categoryId);
+    if (!category) throw new Error('Category not found');
+    
+    return await ProductModel.getByCategory(categoryId, filters);
+  },
 };
 
 module.exports = ProductService; 

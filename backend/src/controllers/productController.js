@@ -120,6 +120,37 @@ const ProductController = {
       next(err);
     }
   },
+  // Get featured products
+  async getFeaturedProducts(req, res, next) {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
+      const products = await ProductService.getFeaturedProducts(limit);
+      res.json({
+        success: true,
+        data: products,
+        count: products.length
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // Get products by category
+  async getProductsByCategory(req, res, next) {
+    try {
+      const { categoryId } = req.params;
+      const filters = req.query;
+      const products = await ProductService.getProductsByCategory(categoryId, filters);
+      res.json({
+        success: true,
+        data: products,
+        category_id: categoryId,
+        count: products.length
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
 };
 
 module.exports = ProductController; 
