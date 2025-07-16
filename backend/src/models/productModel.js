@@ -4,38 +4,64 @@ const { CacheService, CACHE_TTL } = require('../services/cacheService');
 const ProductModel = {
   // Get all products (with optional filters)
   async getAll(filters = {}) {
-    const cacheKey = CacheService.generateKey.products(JSON.stringify(filters));
+    // Create a proper cache key from filters
+    const cacheKey = CacheService.generateKey.products(filters);
+    
     return await CacheService.cacheWrapper(cacheKey, async () => {
-      let query = 'SELECT * FROM products';
-      const values = [];
-      const conditions = [];
-      let idx = 1;
-      // Filtering logic (category, brand, search, etc.)
+      let query = `
+        SELECT p.*, c.name as category_name, b.name as brand_name,
+              pm.media_url as image_url
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN brands b ON p.brand_id = b.id
+        LEFT JOIN product_media pm ON p.id = pm.product_id AND pm.is_primary = true
+        WHERE p.status = 'active'
+      `;
+      
+      const queryParams = [];
+      let paramIndex = 1;
+
+      // Add filter conditions
       if (filters.category_id) {
-        conditions.push(`category_id = $${idx++}`);
-        values.push(filters.category_id);
+        query += ` AND p.category_id = $${paramIndex++}`;
+        queryParams.push(filters.category_id);
       }
-      if (filters.brand_id) {
-        conditions.push(`brand_id = $${idx++}`);
-        values.push(filters.brand_id);
+      if (filters.min_price) {
+        query += ` AND p.price >= $${paramIndex++}`;
+        queryParams.push(filters.min_price);
       }
-      if (filters.status) {
-        conditions.push(`status = $${idx++}`);
-        values.push(filters.status);
+      if (filters.max_price) {
+        query += ` AND p.price <= $${paramIndex++}`;
+        queryParams.push(filters.max_price);
       }
-      if (filters.search) {
-        conditions.push(`LOWER(name) LIKE $${idx++}`);
-        values.push(`%${filters.search.toLowerCase()}%`);
+      if (filters.fabric) {
+        query += ` AND p.fabric ILIKE $${paramIndex++}`;
+        queryParams.push(`%${filters.fabric}%`);
       }
-      if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ');
+      if (filters.featured) {
+        query += ` AND p.featured = $${paramIndex++}`;
+        queryParams.push(filters.featured);
       }
-      query += ' ORDER BY created_at DESC';
-      const result = await db.query(query, values);
+
+      // Add sorting
+      const sortBy = filters.sort || 'created_at';
+      const sortOrder = filters.order || 'DESC';
+      query += ` ORDER BY p.${sortBy} ${sortOrder}`;
+
+      // Add pagination
+      if (filters.limit) {
+        query += ` LIMIT $${paramIndex++}`;
+        queryParams.push(filters.limit);
+      }
+      if (filters.offset) {
+        query += ` OFFSET $${paramIndex++}`;
+        queryParams.push(filters.offset);
+      }
+
+      const result = await db.query(query, queryParams);
       return result.rows;
     }, CACHE_TTL.PRODUCTS);
   },
-
   // Get product by ID
   async getById(id) {
     const cacheKey = CacheService.generateKey.product(id);
