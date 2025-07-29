@@ -1,19 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const CouponController = require('../controllers/couponController');
-// const authMiddleware = require('../middlewares/authMiddleware');
-// const adminMiddleware = require('../middlewares/adminMiddleware');
+const { authenticate, authorize } = require('../middlewares/authMiddleware');
 
-// Public endpoints
+// Public endpoints (validation only - no management)
 router.post('/validate', CouponController.validateCoupon); // Validate coupon (public)
-router.get('/', CouponController.getActiveCoupons); // Get all active coupons (public)
+router.get('/active', CouponController.getActiveCoupons); // Get all active coupons (public)
 
-// Protected endpoints (user must be logged in)
-router.post('/apply', /*authMiddleware,*/ CouponController.applyCoupon); // Apply coupon (protected)
+// ALL COUPON MANAGEMENT IS ADMIN ONLY
+router.use(authenticate);
+router.use(authorize(['admin', 'superadmin']));
 
-// Admin endpoints (add adminMiddleware as needed)
-router.post('/', /*adminMiddleware,*/ CouponController.createCoupon); // Create coupon
-router.put('/:id', /*adminMiddleware,*/ CouponController.updateCoupon); // Update coupon
-router.delete('/:id', /*adminMiddleware,*/ CouponController.deleteCoupon); // Delete coupon
+// Admin-only endpoints
+router.get('/', CouponController.getAllCoupons); // Get all coupons (admin)
+router.get('/:id', CouponController.getCouponById); // Get coupon by ID (admin)
+router.post('/', CouponController.createCoupon); // Create coupon (admin)
+router.put('/:id', CouponController.updateCoupon); // Update coupon (admin)
+router.delete('/:id', CouponController.deleteCoupon); // Delete coupon (admin)
+router.get('/:id/usage', CouponController.getCouponUsage); // Get usage stats (admin)
 
-module.exports = router; 
+module.exports = router;

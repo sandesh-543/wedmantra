@@ -16,7 +16,7 @@ const CacheService = {
   isRedisAvailable() {
     const available = redisManager.isConnected();
     if (!available) {
-      console.log('🔴 Redis not available for cache operation');
+      console.log('Redis not available for cache operation');
     }
     return available;
   },
@@ -28,7 +28,7 @@ const CacheService = {
         await redisManager.connect();
         return true;
       } catch (error) {
-        console.error('❌ Failed to connect to Redis:', error.message);
+        console.error('Failed to connect to Redis:', error.message);
         return false;
       }
     }
@@ -40,7 +40,7 @@ const CacheService = {
     try {
       const connected = await this.ensureConnection();
       if (!connected) {
-        console.log(`🔴 Cache SKIP for key: ${key} (Redis unavailable)`);
+        console.log(`Cache SKIP for key: ${key} (Redis unavailable)`);
         return null;
       }
 
@@ -48,14 +48,14 @@ const CacheService = {
       const data = await client.get(key);
       
       if (data) {
-        console.log(`🟢 Cache HIT for key: ${key}`);
+        console.log(`Cache HIT for key: ${key}`);
         return JSON.parse(data);
       } else {
-        console.log(`🟡 Cache MISS for key: ${key}`);
+        console.log(`Cache MISS for key: ${key}`);
         return null;
       }
     } catch (error) {
-      console.error(`❌ Redis get error for key ${key}:`, error.message);
+      console.error(`Redis get error for key ${key}:`, error.message);
       return null;
     }
   },
@@ -65,16 +65,16 @@ const CacheService = {
     try {
       const connected = await this.ensureConnection();
       if (!connected) {
-        console.log(`🔴 Cache SKIP SET for key: ${key} (Redis unavailable)`);
+        console.log(`Cache SKIP SET for key: ${key} (Redis unavailable)`);
         return false;
       }
 
       const client = redisManager.getClient();
       await client.setEx(key, ttl, JSON.stringify(data));
-      console.log(`🟢 Cache SET for key: ${key} (TTL: ${ttl}s)`);
+      console.log(`Cache SET for key: ${key} (TTL: ${ttl}s)`);
       return true;
     } catch (error) {
-      console.error(`❌ Redis set error for key ${key}:`, error.message);
+      console.error(`Redis set error for key ${key}:`, error.message);
       return false;
     }
   },
@@ -84,16 +84,16 @@ const CacheService = {
     try {
       const connected = await this.ensureConnection();
       if (!connected) {
-        console.log(`🔴 Cache SKIP DEL for key: ${key} (Redis unavailable)`);
+        console.log(`Cache SKIP DEL for key: ${key} (Redis unavailable)`);
         return false;
       }
 
       const client = redisManager.getClient();
       const result = await client.del(key);
-      console.log(`🟢 Cache DEL for key: ${key} (deleted: ${result})`);
+      console.log(`Cache DEL for key: ${key} (deleted: ${result})`);
       return true;
     } catch (error) {
-      console.error(`❌ Redis del error for key ${key}:`, error.message);
+      console.error(`Redis del error for key ${key}:`, error.message);
       return false;
     }
   },
@@ -103,7 +103,7 @@ const CacheService = {
     try {
       const connected = await this.ensureConnection();
       if (!connected) {
-        console.log(`🔴 Cache SKIP DEL PATTERN for: ${pattern} (Redis unavailable)`);
+        console.log(`Cache SKIP DEL PATTERN for: ${pattern} (Redis unavailable)`);
         return false;
       }
 
@@ -111,11 +111,11 @@ const CacheService = {
       const keys = await client.keys(pattern);
       if (keys.length > 0) {
         await client.del(keys);
-        console.log(`🟢 Cache DEL PATTERN: ${pattern} (${keys.length} keys deleted)`);
+        console.log(`Cache DEL PATTERN: ${pattern} (${keys.length} keys deleted)`);
       }
       return true;
     } catch (error) {
-      console.error(`❌ Redis delPattern error for ${pattern}:`, error.message);
+      console.error(`Redis delPattern error for ${pattern}:`, error.message);
       return false;
     }
   },
@@ -131,25 +131,25 @@ const CacheService = {
       }
 
       // If not in cache, execute database query
-      console.log(`🔄 Executing DB query for key: ${key}`);
+      console.log(`Executing DB query for key: ${key}`);
       data = await dbQuery();
       
       // Store in cache if data exists
       if (data !== null && data !== undefined) {
         // Don't await to avoid blocking the response
         this.set(key, data, ttl).catch(err => 
-          console.error(`❌ Background cache set failed for ${key}:`, err.message)
+          console.error(`Background cache set failed for ${key}:`, err.message)
         );
       }
       
       return data;
     } catch (error) {
-      console.error(`❌ Cache wrapper error for ${key}:`, error.message);
+      console.error(`Cache wrapper error for ${key}:`, error.message);
       // Fallback to database query
       try {
         return await dbQuery();
       } catch (dbError) {
-        console.error(`❌ Database query fallback failed for ${key}:`, dbError.message);
+        console.error(`Database query fallback failed for ${key}:`, dbError.message);
         throw dbError;
       }
     }
@@ -159,9 +159,9 @@ const CacheService = {
   async invalidateCache(pattern) {
     try {
       await this.delPattern(pattern);
-      console.log(`🧹 Cache invalidated for pattern: ${pattern}`);
+      console.log(`Cache invalidated for pattern: ${pattern}`);
     } catch (error) {
-      console.error(`❌ Cache invalidation error for ${pattern}:`, error.message);
+      console.error(`Cache invalidation error for ${pattern}:`, error.message);
     }
   },
 
@@ -204,7 +204,7 @@ const CacheService = {
         // Test set/get
         await client.set('test:debug', 'working', 'EX', 10);
         const testValue = await client.get('test:debug');
-        console.log('Test set/get:', testValue === 'working' ? '✅ Working' : '❌ Failed');
+        console.log('Test set/get:', testValue === 'working' ? 'Working' : 'Failed');
         
         // Clean up
         await client.del('test:debug');
