@@ -1,4 +1,5 @@
 const { body, param, query, validationResult } = require('express-validator');
+const { PaginationHelper } = require('../utils/pagination');
 
 // Handle validation errors
 const handleValidationErrors = (req, res, next) => {
@@ -361,6 +362,93 @@ const validateEmail = [
   handleValidationErrors
 ];
 
+// Pagination validation
+const validatePagination = [
+  query('page')
+    .optional()
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Page must be between 1 and 1000'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('sort')
+    .optional()
+    .isIn(['created_at', 'price', 'name', 'featured', 'newest', 'price_asc', 'price_desc', 'name_asc', 'name_desc'])
+    .withMessage('Invalid sort option'),
+  query('order')
+    .optional()
+    .isIn(['ASC', 'DESC', 'asc', 'desc'])
+    .withMessage('Order must be ASC or DESC'),
+  handleValidationErrors
+];
+
+// Enhanced search validation for mobile
+const validateMobileSearch = [
+  query('q')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Search query must be between 1 and 100 characters'),
+  query('category_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Category ID must be a positive integer'),
+  query('min_price')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Minimum price must be a positive number'),
+  query('max_price')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Maximum price must be a positive number'),
+  query('fabric')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Fabric filter too long'),
+  query('occasion')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Occasion filter too long'),
+  ...validatePagination.slice(0, -1), // Include pagination validation without handleValidationErrors
+  handleValidationErrors
+];
+
+// Bulk operation validation
+const validateBulkUpdate = [
+  body('productIds')
+    .isArray({ min: 1, max: 100 })
+    .withMessage('Product IDs must be an array with 1-100 items'),
+  body('productIds.*')
+    .isInt({ min: 1 })
+    .withMessage('Each product ID must be a positive integer'),
+  body('operation')
+    .isIn(['soft_delete', 'restore', 'update_status', 'update_category'])
+    .withMessage('Invalid bulk operation'),
+  body('data')
+    .optional()
+    .isObject()
+    .withMessage('Data must be an object'),
+  handleValidationErrors
+];
+
+// Cart item validation (enhanced)
+const validateCartUpdate = [
+  body('productId')
+    .isInt({ min: 1 })
+    .withMessage('Valid product ID is required'),
+  body('quantity')
+    .isInt({ min: 0, max: 99 })
+    .withMessage('Quantity must be between 0 and 99'),
+  body('action')
+    .optional()
+    .isIn(['add', 'update', 'remove'])
+    .withMessage('Action must be add, update, or remove'),
+  handleValidationErrors
+];
+
 module.exports = {
   validateUserRegistration,
   validateUserLogin,
@@ -377,5 +465,9 @@ module.exports = {
   validateOTP,
   validatePhone,
   validateEmail,
+  validatePagination,
+  validateMobileSearch,
+  validateBulkUpdate,
+  validateCartUpdate,
   handleValidationErrors
 };

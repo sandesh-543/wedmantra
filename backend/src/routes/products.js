@@ -36,4 +36,16 @@ router.get('/admin/all-with-deleted', authenticate, authorize(['superadmin']), P
 // Hard delete (superadmin only - for complete removal)
 router.delete('/:id', authenticate, authorize(['superadmin']), validateIdParam, ProductController.deleteProduct);
 
+// Status and stock management(admin only)
+router.patch('/:id/status', authenticate, authorize(['admin', 'superadmin']), validateIdParam, ProductController.updateProductStatus);
+router.patch('/:id/stock', authenticate, authorize(['admin', 'superadmin']), validateIdParam, ProductController.updateProductStock);
+
+// Bulk operations (admin only)
+// router.post('/bulk-create', authenticate, authorize(['admin', 'superadmin']), ProductController.bulkCreateProducts);
+router.put('/bulk-update', authenticate, authorize(['admin', 'superadmin']), ProductController.bulkUpdateProducts);
+
+// Product statistics (admin only)
+// router.get('/admin/stats/:id', authenticate, authorize(['admin', 'superadmin']), ProductController.getProductStatsById);
+router.get('/admin/stats', authenticate, authorize(['admin', 'superadmin']), ProductController.getProductStats);
+
 module.exports = router;

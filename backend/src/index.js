@@ -123,6 +123,11 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('combined'));
 }
 
+// Import performance monitoring middleware
+const { performanceMonitor, addResponseTime } = require('./middlewares/performance');
+app.use(addResponseTime);
+app.use(performanceMonitor);
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');

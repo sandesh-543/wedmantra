@@ -191,7 +191,7 @@ const CacheService = {
 
   // Debug function to check Redis status
   async debugStatus() {
-    console.log('\n🔍 Redis Debug Status:');
+    console.log('Redis Debug Status:');
     console.log('Redis available:', this.isRedisAvailable());
     
     const connected = await this.ensureConnection();

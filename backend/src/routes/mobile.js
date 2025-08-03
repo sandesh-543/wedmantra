@@ -1,27 +1,27 @@
 const express = require('express');
 const router = express.Router();
+
+// Models
 const ProductModel = require('../models/productModel');
 const CategoryModel = require('../models/categoryModel');
 const BannerModel = require('../models/bannerModel');
+const CartModel = require('../models/cartModel');
+
+// Services
+const MobileProductService = require('../services/mobileProductService');
+const UserContextService = require('../services/userContextService');
+const RecentlyViewedService = require('../services/recentlyViewedService');
+const WishlistService = require('../services/wishlistService');
+
+// Utilities
+const MobileHelpers = require('../utils/mobileHelpers');
 const { authenticate, optionalAuth } = require('../middlewares/authMiddleware');
 const { validateSearchQuery, validateIdParam } = require('../middlewares/validation');
 
-// Mobile response formatter
-const mobileResponse = (data, message = 'Success') => ({
-  success: true,
-  message,
-  data,
-  timestamp: new Date().toISOString()
-});
+// ===================================
+// MOBILE CONFIGURATION
+// ===================================
 
-const mobileError = (message, code = 500) => ({
-  success: false,
-  message,
-  code,
-  timestamp: new Date().toISOString()
-});
-
-// App configuration for mobile clients
 router.get('/config', (req, res) => {
   const config = {
     app: {
@@ -54,10 +54,13 @@ router.get('/config', (req, res) => {
     }
   };
   
-  res.json(mobileResponse(config));
+  res.json(MobileHelpers.mobileResponse(config));
 });
 
-// Home screen data - optimized for mobile
+// ===================================
+// HOME SCREEN API
+// ===================================
+
 router.get('/home', optionalAuth, async (req, res) => {
   try {
     const [banners, categories, featuredProducts] = await Promise.all([
@@ -66,7 +69,17 @@ router.get('/home', optionalAuth, async (req, res) => {
       ProductModel.getFeatured(8)
     ]);
     
-    // Format data for mobile consumption
+    // Get enhanced data for mobile
+    const [categoriesWithCount, featuredWithRatings] = await Promise.all([
+      Promise.all(
+        categories.slice(0, 8).map(async (category) => {
+          const productCount = await MobileProductService.getCategoryProductCount(category.id);
+          return MobileHelpers.formatCategoryForMobile(category, productCount);
+        })
+      ),
+      MobileProductService.getProductsWithMobileData(featuredProducts, req.user?.id)
+    ]);
+    
     const homeData = {
       banners: banners.slice(0, 5).map(banner => ({
         id: banner.id,
@@ -79,25 +92,8 @@ router.get('/home', optionalAuth, async (req, res) => {
         buttonText: banner.button_text
       })),
       
-      categories: categories.slice(0, 8).map(category => ({
-        id: category.id,
-        name: category.name,
-        slug: category.slug,
-        imageUrl: category.image_url,
-        productCount: 0 // TODO: Add product count if needed
-      })),
-      
-      featuredProducts: featuredProducts.map(product => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        salePrice: product.sale_price,
-        imageUrl: product.image_url,
-        rating: 4.5, // TODO: Calculate from reviews
-        reviewCount: 0, // TODO: Get from reviews
-        fabric: product.fabric,
-        isWishlisted: false // TODO: Check if user has wishlisted
-      })),
+      categories: categoriesWithCount,
+      featuredProducts: featuredWithRatings,
       
       quickActions: [
         { title: 'New Arrivals', icon: 'new', action: 'category', value: 'new-arrivals' },
@@ -113,259 +109,423 @@ router.get('/home', optionalAuth, async (req, res) => {
       }
     };
     
-    res.json(mobileResponse(homeData));
+    res.json(MobileHelpers.mobileResponse(homeData));
   } catch (error) {
-    console.error('Home data error:', error);
-    res.status(500).json(mobileError('Failed to load home data'));
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
   }
 });
 
-// Product search optimized for mobile
-router.get('/search', validateSearchQuery, async (req, res) => {
+// ===================================
+// PRODUCT APIS
+// ===================================
+
+// Ultra-fast product list for mobile
+router.get('/products/quick', async (req, res) => {
   try {
-    const { 
-      q, 
-      category_id, 
-      min_price, 
-      max_price, 
-      fabric, 
-      occasion, 
-      sort = 'newest',
-      page = 1, 
-      limit = 20 
-    } = req.query;
-    
-    const result = await ProductModel.search({
-      q, 
-      category_id, 
-      min_price, 
-      max_price, 
-      fabric, 
-      occasion, 
-      sort,
-      page, 
-      limit
+    const validation = MobileHelpers.validateMobileParams(req, {
+      page: { type: 'number', min: 1, max: 1000 },
+      limit: { type: 'number', min: 1, max: 20 },
+      category_id: { type: 'number', min: 1 }
     });
     
-    // Format products for mobile
-    const mobileProducts = result.products.map(product => ({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      salePrice: product.sale_price,
-      imageUrl: product.image_url,
-      fabric: product.fabric,
-      occasion: product.occasion,
-      region: product.region,
-      rating: 4.2, // TODO: Calculate from reviews
-      reviewCount: 12, // TODO: Get from reviews
-      isWishlisted: false, // TODO: Check if user has wishlisted
-      inStock: product.stock_quantity > 0,
-      discount: product.sale_price ? 
-        Math.round(((product.price - product.sale_price) / product.price) * 100) : 0
-    }));
+    if (!validation.isValid) {
+      return res.status(400).json(MobileHelpers.mobileError('Invalid parameters', 400, validation.errors));
+    }
+    
+    const { page = 1, limit = 10, category_id, search } = req.query;
+    
+    const filters = {
+      page: parseInt(page),
+      limit: Math.min(parseInt(limit), 20),
+      category_id,
+      search,
+      sort: 'created_at',
+      order: 'DESC'
+    };
+    
+    const result = await ProductModel.getAll(filters);
+    const mobileProducts = await MobileProductService.getProductsWithMobileData(result.products, req.user?.id);
     
     res.json({
       success: true,
       data: mobileProducts,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: result.total,
-        pages: Math.ceil(result.total / limit),
-        hasMore: (page * limit) < result.total
-      },
-      filters: {
-        appliedFilters: { q, category_id, min_price, max_price, fabric, occasion },
-        availableFilters: {
-          fabrics: ['Cotton', 'Silk', 'Georgette', 'Chiffon', 'Crepe'],
-          occasions: ['Wedding', 'Festival', 'Party', 'Casual', 'Office'],
-          priceRanges: [
-            { min: 0, max: 1000, label: 'Under ₹1,000' },
-            { min: 1000, max: 3000, label: '₹1,000 - ₹3,000' },
-            { min: 3000, max: 5000, label: '₹3,000 - ₹5,000' },
-            { min: 5000, max: 10000, label: '₹5,000 - ₹10,000' },
-            { min: 10000, max: null, label: 'Above ₹10,000' }
-          ]
+      pagination: result.pagination,
+      meta: {
+        timestamp: new Date().toISOString(),
+        cached: false
+      }
+    });
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+// Enhanced product details for mobile
+router.get('/products/:id/mobile', validateIdParam, optionalAuth, async (req, res) => {
+  try {
+    const product = await ProductModel.getById(req.params.id);
+    if (!product) {
+      return res.status(404).json(MobileHelpers.mobileError('Product not found'));
+    }
+    
+    // Track view if user is authenticated
+    if (req.user) {
+      await RecentlyViewedService.track(req.user.id, req.params.id);
+    }
+    
+    // Get all required data
+    const [media, relatedProducts, rating, userContext] = await Promise.all([
+      ProductModel.getMedia(req.params.id),
+      ProductModel.getByCategory(product.category_id, { limit: 4 }),
+      MobileProductService.getProductRating(req.params.id),
+      req.user ? UserContextService.getProductUserContext(req.user.id, req.params.id) : {}
+    ]);
+    
+    // Format related products
+    const relatedWithRatings = await MobileProductService.getProductsWithMobileData(
+      relatedProducts.slice(0, 4), 
+      req.user?.id
+    );
+    
+    // Create mobile-optimized product details
+    const mobileProduct = MobileHelpers.formatProductForDetail(product, userContext, {
+      images: media.filter(m => m.media_type === 'image').map(m => ({
+        id: m.id,
+        url: m.media_url,
+        thumbnail: m.media_url,
+        alt: m.alt_text,
+        isPrimary: m.is_primary
+      })),
+      rating: rating.rating,
+      reviewCount: rating.reviewCount,
+      relatedProducts: relatedWithRatings
+    });
+    
+    res.json(MobileHelpers.mobileResponse(mobileProduct));
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+// Quick search for mobile
+router.get('/search/quick', async (req, res) => {
+  try {
+    const { q, limit = 10 } = req.query;
+    
+    if (!q || q.length < 2) {
+      return res.json({
+        success: true,
+        data: [],
+        suggestions: ['Silk Sarees', 'Cotton Sarees', 'Wedding Collection', 'Casual Wear']
+      });
+    }
+    
+    const result = await ProductModel.search({
+      q: MobileHelpers.sanitizeMobileInput(q, 'string'),
+      limit: Math.min(parseInt(limit), 20),
+      page: 1
+    });
+    
+    const quickResults = result.products.map(product => 
+      MobileHelpers.formatProductForList(product)
+    );
+    
+    res.json({
+      success: true,
+      data: quickResults,
+      total: result.total,
+      query: q
+    });
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+// Popular/trending products
+router.get('/products/popular', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 8, 20);
+    const trending = await MobileProductService.getTrendingProducts(limit);
+    const popularProducts = await MobileProductService.getProductsWithMobileData(trending, req.user?.id);
+    
+    res.json(MobileHelpers.mobileResponse(popularProducts));
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+// ===================================
+// CATEGORY APIS
+// ===================================
+
+router.get('/categories/quick', async (req, res) => {
+  try {
+    const categories = await CategoryModel.getAll();
+    
+    const mobileCategories = await Promise.all(
+      categories.slice(0, 8).map(async (cat) => {
+        const productCount = await MobileProductService.getCategoryProductCount(cat.id);
+        return MobileHelpers.formatCategoryForMobile(cat, productCount);
+      })
+    );
+    
+    res.json({
+      success: true,
+      data: mobileCategories,
+      meta: {
+        total: categories.length,
+        showing: mobileCategories.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+// ===================================
+// CART APIS
+// ===================================
+
+router.get('/cart/quick', authenticate, async (req, res) => {
+  try {
+    const cartItems = await CartModel.getCartByUser(req.user.id);
+    const cartSummary = MobileHelpers.formatCartSummary(cartItems);
+    
+    const optimizedItems = await Promise.all(
+      cartItems.map(async (item) => {
+        const product = await ProductModel.getById(item.product_id);
+        const maxQuantity = product ? Math.min(product.stock_quantity, 10) : 0;
+        
+        return {
+          id: item.id,
+          productId: item.product_id,
+          name: item.name,
+          price: item.price,
+          salePrice: item.sale_price,
+          quantity: item.quantity,
+          image: item.image_url,
+          total: (item.sale_price || item.price) * item.quantity,
+          sku: item.sku,
+          maxQuantity,
+          inStock: product ? product.stock_quantity > 0 : false
+        };
+      })
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        items: optimizedItems,
+        summary: cartSummary,
+        meta: {
+          currency: 'INR',
+          lastUpdated: new Date().toISOString()
         }
       }
     });
   } catch (error) {
-    console.error('Search error:', error);
-    res.status(500).json(mobileError('Search failed'));
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
   }
 });
 
-// Get product details optimized for mobile
-router.get('/products/:id', validateIdParam, optionalAuth, async (req, res) => {
+router.post('/cart/update', authenticate, async (req, res) => {
   try {
-    const product = await ProductModel.getById(req.params.id);
-    if (!product) {
-      return res.status(404).json(mobileError('Product not found'));
-    }
-    
-    // Get product media and attributes
-    const [media, attributes] = await Promise.all([
-      ProductModel.getMedia(req.params.id),
-      ProductModel.getAttributes(req.params.id)
-    ]);
-    
-    // Format for mobile
-    const mobileProduct = {
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      shortDescription: product.short_description,
-      price: product.price,
-      salePrice: product.sale_price,
-      sku: product.sku,
-      
-      // Product details
-      fabric: product.fabric,
-      workType: product.work_type,
-      occasion: product.occasion,
-      region: product.region,
-      length: product.length,
-      blousePiece: product.blouse_piece,
-      washCare: product.wash_care,
-      
-      // Media
-      images: media.filter(m => m.media_type === 'image').map(m => ({
-        id: m.id,
-        url: m.media_url,
-        alt: m.alt_text,
-        isPrimary: m.is_primary
-      })),
-      videos: media.filter(m => m.media_type === 'video').map(m => ({
-        id: m.id,
-        url: m.media_url,
-        thumbnail: m.thumbnail_url,
-        duration: m.duration
-      })),
-      
-      // Stock and pricing
-      inStock: product.stock_quantity > 0,
-      stockQuantity: product.stock_quantity,
-      discount: product.sale_price ? 
-        Math.round(((product.price - product.sale_price) / product.price) * 100) : 0,
-      
-      // Social proof
-      rating: 4.3, // TODO: Calculate from reviews
-      reviewCount: 25, // TODO: Get from reviews
-      
-      // User context
-      isWishlisted: false, // TODO: Check if user has wishlisted
-      inCart: false, // TODO: Check if user has in cart
-      
-      // Additional attributes
-      customAttributes: attributes.reduce((acc, attr) => {
-        acc[attr.attribute_name] = attr.attribute_value;
-        return acc;
-      }, {}),
-      
-      // Related info
-      category: {
-        id: product.category_id,
-        name: product.category_name // TODO: Join with category
-      },
-      brand: {
-        id: product.brand_id,
-        name: product.brand_name // TODO: Join with brand
-      },
-      
-      // Shipping info
-      shipping: {
-        freeShipping: product.price >= 500,
-        estimatedDays: '3-5 days',
-        returnPolicy: '7 days return'
-      }
-    };
-    
-    res.json(mobileResponse(mobileProduct));
-  } catch (error) {
-    console.error('Product details error:', error);
-    res.status(500).json(mobileError('Failed to load product details'));
-  }
-});
-
-// Get products by category
-router.get('/categories/:id/products', validateIdParam, async (req, res) => {
-  try {
-    const { page = 1, limit = 20, sort = 'newest' } = req.query;
-    const products = await ProductModel.getByCategory(req.params.id, { 
-      page, 
-      limit, 
-      sort 
+    const validation = MobileHelpers.validateMobileParams(req, {
+      productId: { type: 'number', required: true, min: 1 },
+      quantity: { type: 'number', min: 0, max: 99 },
+      action: { type: 'string', enum: ['add', 'update', 'remove'] }
     });
     
-    const mobileProducts = products.map(product => ({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      salePrice: product.sale_price,
-      imageUrl: product.image_url,
-      fabric: product.fabric,
-      rating: 4.2,
-      reviewCount: 8,
-      isWishlisted: false,
-      discount: product.sale_price ? 
-        Math.round(((product.price - product.sale_price) / product.price) * 100) : 0
-    }));
+    if (!validation.isValid) {
+      return res.status(400).json(MobileHelpers.mobileError('Invalid parameters', 400, validation.errors));
+    }
+    
+    const { productId, quantity, action = 'add' } = req.body;
+    const userId = req.user.id;
+    
+    const product = await ProductModel.getById(productId);
+    if (!product) {
+      return res.status(404).json(MobileHelpers.mobileError('Product not found'));
+    }
+    
+    if (action !== 'remove' && quantity > product.stock_quantity) {
+      return res.status(400).json(MobileHelpers.mobileError('Insufficient stock', 400, {
+        available: product.stock_quantity,
+        requested: quantity
+      }));
+    }
+    
+    // Perform cart operation
+    let result;
+    let message;
+    
+    switch (action) {
+      case 'add':
+        result = await CartModel.addItem(userId, productId, quantity);
+        message = 'Item added to cart';
+        break;
+        
+      case 'update':
+        const cartItems = await CartModel.getCartByUser(userId);
+        const cartItem = cartItems.find(item => item.product_id === productId);
+        if (!cartItem) {
+          return res.status(404).json(MobileHelpers.mobileError('Item not found in cart'));
+        }
+        if (quantity === 0) {
+          await CartModel.removeItem(cartItem.id);
+          message = 'Item removed from cart';
+        } else {
+          result = await CartModel.updateItem(cartItem.id, quantity);
+          message = 'Cart updated';
+        }
+        break;
+        
+      case 'remove':
+        const items = await CartModel.getCartByUser(userId);
+        const itemToRemove = items.find(item => item.product_id === productId);
+        if (itemToRemove) {
+          await CartModel.removeItem(itemToRemove.id);
+        }
+        message = 'Item removed from cart';
+        break;
+    }
+    
+    // Get updated cart summary
+    const updatedCart = await CartModel.getCartByUser(userId);
+    const summary = MobileHelpers.formatCartSummary(updatedCart);
     
     res.json({
       success: true,
-      data: mobileProducts,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        hasMore: products.length === parseInt(limit)
+      message,
+      data: {
+        ...summary,
+        product: MobileHelpers.formatProductForList(product),
+        action,
+        quantity: quantity || 0
       }
     });
   } catch (error) {
-    console.error('Category products error:', error);
-    res.status(500).json(mobileError('Failed to load category products'));
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
   }
 });
 
-// Get all categories for mobile
-router.get('/categories', async (req, res) => {
+router.get('/cart/count', authenticate, async (req, res) => {
   try {
-    const categories = await CategoryModel.getAll();
+    const cartItems = await CartModel.getCartByUser(req.user.id);
+    const count = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     
-    const mobileCategories = categories.map(category => ({
-      id: category.id,
-      name: category.name,
-      slug: category.slug,
-      imageUrl: category.image_url,
-      productCount: 0, // TODO: Add if needed
-      subcategories: [] // TODO: Add if needed
-    }));
-    
-    res.json(mobileResponse(mobileCategories));
+    res.json({
+      success: true,
+      data: { 
+        count,
+        itemCount: cartItems.length
+      }
+    });
   } catch (error) {
-    console.error('Categories error:', error);
-    res.status(500).json(mobileError('Failed to load categories'));
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
   }
 });
 
-// App version check
+// ===================================
+// WISHLIST APIS
+// ===================================
+
+router.get('/wishlist', authenticate, async (req, res) => {
+  try {
+    const wishlistItems = await WishlistService.getByUser(req.user.id);
+    
+    const mobileWishlist = await Promise.all(
+      wishlistItems.map(async (item) => {
+        const rating = await MobileProductService.getProductRating(item.product_id);
+        return {
+          ...MobileHelpers.formatProductForList(item),
+          rating: rating.rating,
+          reviewCount: rating.reviewCount,
+          addedAt: item.created_at
+        };
+      })
+    );
+    
+    res.json({
+      success: true,
+      data: mobileWishlist,
+      count: mobileWishlist.length
+    });
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+router.post('/wishlist/add', authenticate, async (req, res) => {
+  try {
+    const { productId } = req.body;
+    
+    if (!productId) {
+      return res.status(400).json(MobileHelpers.mobileError('Product ID is required'));
+    }
+    
+    const product = await ProductModel.getById(productId);
+    if (!product) {
+      return res.status(404).json(MobileHelpers.mobileError('Product not found'));
+    }
+    
+    await WishlistService.addItem(req.user.id, productId);
+    
+    res.json({
+      success: true,
+      message: 'Item added to wishlist',
+      data: {
+        productId,
+        productName: product.name,
+        productImage: product.image_url
+      }
+    });
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+router.delete('/wishlist/remove/:productId', authenticate, validateIdParam, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    await WishlistService.removeItem(req.user.id, productId);
+    
+    res.json({
+      success: true,
+      message: 'Item removed from wishlist',
+      data: { productId: parseInt(productId) }
+    });
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+// ===================================
+// USER SPECIFIC APIS
+// ===================================
+
+router.get('/recent', authenticate, async (req, res) => {
+  try {
+    const recentProducts = await RecentlyViewedService.getRecentlyViewed(req.user.id, 10);
+    const mobileRecent = await MobileProductService.getProductsWithMobileData(recentProducts, req.user.id);
+    
+    res.json(MobileHelpers.mobileResponse(mobileRecent));
+  } catch (error) {
+    res.status(500).json(MobileHelpers.formatApiError(error, req));
+  }
+});
+
+// ===================================
+// UTILITY APIS
+// ===================================
+
 router.get('/version-check', (req, res) => {
   const { version, platform } = req.query;
   
-  const minVersions = {
-    ios: '1.0.0',
-    android: '1.0.0'
-  };
-  
-  const currentVersions = {
-    ios: '1.0.0',
-    android: '1.0.0'
-  };
-  
   const response = {
-    currentVersion: currentVersions[platform] || '1.0.0',
-    minSupportedVersion: minVersions[platform] || '1.0.0',
-    forceUpdate: false, // Set to true when you need to force update
+    currentVersion: '1.0.0',
+    minSupportedVersion: '1.0.0',
+    forceUpdate: false,
     recommendUpdate: false,
     updateMessage: 'A new version is available with bug fixes and improvements.',
     downloadUrl: platform === 'ios' 
@@ -373,93 +533,12 @@ router.get('/version-check', (req, res) => {
       : 'https://play.google.com/store/apps/details?id=com.wedmantra.app'
   };
   
-  res.json(mobileResponse(response));
+  res.json(MobileHelpers.mobileResponse(response));
 });
 
-// Quick actions for home screen
-router.get('/quick-actions', async (req, res) => {
-  try {
-    const actions = [
-      {
-        id: 'new_arrivals',
-        title: 'New Arrivals',
-        subtitle: 'Latest collections',
-        icon: 'sparkles',
-        color: '#FF6B35',
-        action: 'navigate',
-        route: 'ProductList',
-        params: { filter: 'new' }
-      },
-      {
-        id: 'sale',
-        title: 'Sale',
-        subtitle: 'Up to 70% off',
-        icon: 'tag',
-        color: '#E74C3C',
-        action: 'navigate',
-        route: 'ProductList',
-        params: { filter: 'sale' }
-      },
-      {
-        id: 'wedding',
-        title: 'Wedding Collection',
-        subtitle: 'Bridal sarees',
-        icon: 'heart',
-        color: '#9B59B6',
-        action: 'navigate',
-        route: 'ProductList',
-        params: { occasion: 'wedding' }
-      },
-      {
-        id: 'festive',
-        title: 'Festive Wear',
-        subtitle: 'Festival specials',
-        icon: 'star',
-        color: '#F39C12',
-        action: 'navigate',
-        route: 'ProductList',
-        params: { occasion: 'festival' }
-      }
-    ];
-    
-    res.json(mobileResponse(actions));
-  } catch (error) {
-    res.status(500).json(mobileError('Failed to load quick actions'));
-  }
-});
-
-// Recently viewed products (requires auth)
-router.get('/recent', authenticate, async (req, res) => {
-  try {
-    // TODO: Implement recently viewed tracking
-    const recentProducts = [];
-    res.json(mobileResponse(recentProducts));
-  } catch (error) {
-    res.status(500).json(mobileError('Failed to load recent products'));
-  }
-});
-
-// Trending/popular products
-router.get('/trending', async (req, res) => {
-  try {
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
-    // TODO: Implement trending logic based on views/orders
-    const trending = await ProductModel.getFeatured(limit);
-    
-    const mobileTrending = trending.map(product => ({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      salePrice: product.sale_price,
-      imageUrl: product.image_url,
-      fabric: product.fabric,
-      trendingRank: Math.floor(Math.random() * 100) + 1
-    }));
-    
-    res.json(mobileResponse(mobileTrending));
-  } catch (error) {
-    res.status(500).json(mobileError('Failed to load trending products'));
-  }
+router.get('/search/filters', (req, res) => {
+  const filters = MobileHelpers.formatSearchFilters();
+  res.json(MobileHelpers.mobileResponse(filters));
 });
 
 module.exports = router;
